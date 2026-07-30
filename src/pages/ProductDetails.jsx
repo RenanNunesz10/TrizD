@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useCartStore } from '../store/cartStore';
+import ModelViewer from '../components/ModelViewer';
 
 export default function ProductDetails() {
   const { id } = useParams(); // Pega o ID passado na URL
@@ -74,18 +75,12 @@ export default function ProductDetails() {
 
   return (
     <div className="bg-white p-6 md:p-12 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row gap-8">
-      {/* Área do Visualizador 3D (ou Imagem por enquanto) */}
-      <div className="w-full md:w-1/2 h-80 bg-gray-100 flex items-center justify-center rounded-lg border border-gray-200 overflow-hidden">
-        {produto.imagem_url ? (
-          <img 
-            src={produto.imagem_url} 
-            alt={produto.nome} 
-            className="h-full w-full object-cover" 
-          />
-        ) : (
-          <span className="text-gray-400 font-medium">[ Visualizador 3D Aqui ]</span>
-        )}
-      </div>
+      {/* Área do Visualizador 3D */}
+        <div className="w-full md:w-1/2 h-80 bg-gray-50 flex items-center justify-center rounded-lg border border-gray-200 overflow-hidden shadow-inner">
+        {/* Se houver um link de imagem/modelo no Supabase, passamos para o visualizador.
+            Se não houver, ele mostra a forma 3D padrão girando. */}
+        <ModelViewer modelUrl={produto.imagem_url?.endsWith('.glb') ? produto.imagem_url : null} />
+        </div>
       
       {/* Informações Reais do Produto */}
       <div className="w-full md:w-1/2 flex flex-col justify-center">
