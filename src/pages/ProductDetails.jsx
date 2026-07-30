@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import ModelViewer from '../components/ModelViewer';
+import toast from 'react-hot-toast';
 
 export default function ProductDetails() {
   const { id } = useParams(); // Pega o ID passado na URL
@@ -40,7 +41,6 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (produto) {
-      // Adiciona o produto real (com dados do Supabase) ao carrinho
       addToCart({
         id: produto.id,
         nome: produto.nome,
@@ -50,7 +50,16 @@ export default function ProductDetails() {
         imagem_url: produto.imagem_url
       });
 
-      alert(`${produto.nome} foi adicionado ao carrinho!`);
+      // Substituímos o alert nativo por isso:
+      toast.success(`${produto.nome} adicionado ao carrinho!`, {
+        style: {
+          background: '#333',
+          color: '#fff',
+        },
+      });
+      
+      // Opcional: já abrir a gaveta automaticamente quando adicionar
+      // useCartStore.getState().openCart(); 
     }
   };
 
