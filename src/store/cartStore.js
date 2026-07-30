@@ -19,6 +19,7 @@ export const useCartStore = create(
 
       openCart: () => set({ isCartOpen: true }),
       closeCart: () => set({ isCartOpen: false }),
+      clearCart: () => set({ cart: [] }),
     }),
     {
       name: 'loja-3d-carrinho', // Nome da chave salva no navegador

@@ -4,7 +4,8 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
-import CartDrawer from './components/CartDrawer'; // IMPORTAÇÃO NOVO
+import CartDrawer from './components/CartDrawer';
+import Checkout from './pages/Checkout';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/produto/:id" element={<ProductDetails />} />
+            <Route path="/checkout" element={<Checkout />} />
           </Routes>
         </main>
         <Footer />

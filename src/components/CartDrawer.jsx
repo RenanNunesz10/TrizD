@@ -1,8 +1,11 @@
 import { X, Trash2 } from 'lucide-react';
 import { useCartStore } from '../store/cartStore';
+import { useNavigate } from 'react-router-dom';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, closeCart, removeFromCart } = useCartStore();
+  const navigate = useNavigate();
+  
 
   return (
     <>
@@ -54,7 +57,13 @@ export default function CartDrawer() {
 
         {cart.length > 0 && (
           <div className="p-4 border-t bg-gray-50">
-            <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors">
+            <button 
+              onClick={() => {
+                closeCart(); // Fecha a gaveta
+                navigate('/checkout'); // Leva para a página de checkout
+              }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer"
+            >
               Finalizar Compra
             </button>
           </div>
