@@ -10,6 +10,8 @@ import Login from './pages/Login';
 import CartDrawer from './components/CartDrawer';
 import { useAuthStore } from './store/authStore';
 import Profile from './pages/Profile';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 
 export default function App() {
   // Puxa a função que checa o login
@@ -34,6 +36,8 @@ export default function App() {
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/login" element={<Login />} />
             <Route path="/perfil" element={<Profile />} />
+            <Route path="/cadastro" element={<Register />} />
+            <Route path="/recuperar-senha" element={<ForgotPassword />} />
           </Routes>
         </main>
         <Footer />

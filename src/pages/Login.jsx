@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // <--- O Link precisa estar aqui!
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -67,6 +67,19 @@ export default function Login() {
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
+
+      {/* NOVOS LINKS AQUI */}
+      <div className="mt-6 flex flex-col items-center gap-2 text-sm text-gray-600">
+        <Link to="/recuperar-senha" className="text-blue-600 hover:underline">
+          Esqueceu sua senha?
+        </Link>
+        <div>
+          Não tem uma conta?{' '}
+          <Link to="/cadastro" className="text-blue-600 hover:underline font-semibold">
+            Cadastre-se
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

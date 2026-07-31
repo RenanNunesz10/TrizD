@@ -1,9 +1,12 @@
 import { X, Trash2 } from 'lucide-react';
 import { useCartStore } from '../store/cartStore';
+import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, closeCart, removeFromCart } = useCartStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
   
 
@@ -59,8 +62,16 @@ export default function CartDrawer() {
           <div className="p-4 border-t bg-gray-50">
             <button 
               onClick={() => {
-                closeCart(); // Fecha a gaveta
-                navigate('/checkout'); // Leva para a página de checkout
+                closeCart(); // Fecha a gaveta primeiro
+                
+                if (!user) {
+                  // Se não estiver logado, avisa e manda pro login
+                  toast('Faça login ou crie uma conta para finalizar a compra.', { icon: '🔒' });
+                  navigate('/login');
+                } else {
+                  // Se estiver logado, vai pro checkout normalmente
+                  navigate('/checkout');
+                }
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer"
             >

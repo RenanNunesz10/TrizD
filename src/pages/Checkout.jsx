@@ -99,6 +99,23 @@ export default function Checkout() {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Acesso Restrito 🔒</h2>
+        <p className="text-gray-600 mb-6">Você precisa estar logado para acessar o pagamento.</p>
+        <div className="flex gap-4 justify-center">
+          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">
+            Fazer Login
+          </button>
+          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
+            Criar Conta
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row">
       <div className="w-full md:w-2/3 p-6 md:p-10">
