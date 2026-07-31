@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
@@ -7,19 +7,46 @@ import toast from 'react-hot-toast';
 
 export default function Checkout() {
   const { cart, clearCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, perfil } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [enderecosSalvos, setEnderecosSalvos] = useState([]);
 
   const [formData, setFormData] = useState({
-    nome: '', email: user?.email || '', endereco: '', cidade: '', cep: ''
+    nome: perfil?.nome || '', email: user?.email || '', endereco: '', cidade: '', cep: ''
   });
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  useEffect(() => {
+    if (perfil?.nome) setFormData((prev) => ({ ...prev, nome: perfil.nome }));
+    if (user?.email) setFormData((prev) => ({ ...prev, email: user.email }));
+
+    // Busca os endereços salvos do cliente
+    async function fetchEnderecos() {
+      if (!user) return;
+      const { data } = await supabase.from('enderecos').select('*').eq('user_id', user.id);
+      if (data) setEnderecosSalvos(data);
+    }
+    fetchEnderecos();
+  }, [user, perfil]);
+
+  const handleSelecionarEnderecoSalvo = (e) => {
+    const enderecoId = e.target.value;
+    if (!enderecoId) return;
+
+    const selecionado = enderecosSalvos.find((end) => end.id === enderecoId);
+    if (selecionado) {
+      setFormData({
+        ...formData,
+        endereco: `${selecionado.rua}, ${selecionado.numero}${selecionado.complemento ? ' (' + selecionado.complemento + ')' : ''} - ${selecionado.bairro}`,
+        cidade: selecionado.cidade,
+        cep: selecionado.cep,
+      });
+      toast.success(`Endereço "${selecionado.titulo}" aplicado!`);
+    }
   };
 
-  // Função auxiliar para converter preço text/numeric em número puro
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
   const parsePreco = (preco) => {
     if (typeof preco === 'number') return preco;
     const num = parseFloat(preco.replace('R$', '').replace('.', '').replace(',', '.').trim());
@@ -47,38 +74,26 @@ export default function Checkout() {
     try {
       const enderecoCompleto = `${formData.endereco}, ${formData.cidade} - CEP: ${formData.cep}`;
 
-      // 1. Criar o Pedido Principal
       const { data: pedido, error: errorPedido } = await supabase
         .from('pedidos')
-        .insert([
-          {
-            user_id: user.id,
-            status: 'Em Impressão 3D', // Status inicial customizado para loja 3D!
-            total: totalCalculado,
-            endereco_entrega: enderecoCompleto,
-          }
-        ])
+        .insert([{ user_id: user.id, status: 'Em Impressão 3D', total: totalCalculado, endereco_entrega: enderecoCompleto }])
         .select()
         .single();
 
       if (errorPedido) throw errorPedido;
 
-      // 2. Inserir todos os itens do carrinho na tabela 'itens_pedido'
       const itensParaInserir = cart.map((item) => ({
         pedido_id: pedido.id,
         nome_produto: item.nome,
         preco_unitario: parsePreco(item.preco),
       }));
 
-      const { error: errorItens } = await supabase
-        .from('itens_pedido')
-        .insert(itensParaInserir);
-
+      const { error: errorItens } = await supabase.from('itens_pedido').insert(itensParaInserir);
       if (errorItens) throw errorItens;
 
       toast.success('Pedido realizado com sucesso! 🎉');
       clearCart();
-      navigate('/perfil'); // Redireciona direto para a página "Meus Pedidos"
+      navigate('/perfil');
 
     } catch (error) {
       console.error('Erro ao salvar pedido:', error);
@@ -92,9 +107,7 @@ export default function Checkout() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Seu carrinho está vazio</h2>
-        <button onClick={() => navigate('/')} className="text-blue-600 hover:underline">
-          Voltar para a loja
-        </button>
+        <button onClick={() => navigate('/')} className="text-blue-600 hover:underline">Voltar para a loja</button>
       </div>
     );
   }
@@ -105,26 +118,36 @@ export default function Checkout() {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Acesso Restrito 🔒</h2>
         <p className="text-gray-600 mb-6">Você precisa estar logado para acessar o pagamento.</p>
         <div className="flex gap-4 justify-center">
-          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">
-            Fazer Login
-          </button>
-          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
-            Criar Conta
-          </button>
+          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">Fazer Login</button>
+          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">Criar Conta</button>
         </div>
       </div>
     );
   }
-  
+
   return (
     <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row">
       <div className="w-full md:w-2/3 p-6 md:p-10">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Dados de Entrega</h2>
+
+        {/* Seletor de Endereços Salvos */}
+        {enderecosSalvos.length > 0 && (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <label className="block text-sm font-bold text-blue-800 mb-2">Usar um Endereço Salvo:</label>
+            <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-2 border border-blue-300 rounded bg-white font-medium text-gray-700 outline-none">
+              <option value="">-- Selecione para preencher automaticamente --</option>
+              {enderecosSalvos.map((end) => (
+                <option key={end.id} value={end.id}>{end.titulo} - {end.rua}, {end.numero}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <form id="checkout-form" onSubmit={handleFinalizarPedido} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <input required type="text" name="nome" onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input required type="text" name="nome" value={formData.nome} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
@@ -133,16 +156,16 @@ export default function Checkout() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Endereço (Rua, Número, Bairro)</label>
-            <input required type="text" name="endereco" onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+            <input required type="text" name="endereco" value={formData.endereco} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cidade / Estado</label>
-              <input required type="text" name="cidade" onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input required type="text" name="cidade" value={formData.cidade} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-              <input required type="text" name="cep" onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input required type="text" name="cep" value={formData.cep} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
           </div>
         </form>
@@ -164,12 +187,7 @@ export default function Checkout() {
             <span className="text-blue-600">R$ {totalCalculado.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
-        <button 
-          form="checkout-form" 
-          type="submit" 
-          disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer disabled:bg-gray-400"
-        >
+        <button form="checkout-form" type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer disabled:bg-gray-400">
           {loading ? 'Processando...' : 'Confirmar e Pagar'}
         </button>
       </div>
