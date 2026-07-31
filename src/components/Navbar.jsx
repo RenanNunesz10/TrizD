@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // <-- Adicionamos o useLocation
 import { Menu, X, ShoppingCart, User, LogOut } from 'lucide-react';
 import { useCartStore } from '../store/cartStore';
-import { useAuthStore } from '../store/authStore'; // IMPORTAÇÃO NOVA
+import { useAuthStore } from '../store/authStore';
 
 export default function Navbar() {
   const { cart, openCart } = useCartStore();
-  const { user, perfil, logout } = useAuthStore(); // Puxa os dados do usuário
+  const { user, perfil, logout } = useAuthStore();
   const [isMenuMobileOpen, setIsMenuMobileOpen] = useState(false);
   const navigate = useNavigate();
+  
+  // Verifica em qual página estamos
+  const location = useLocation();
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   const handleLogout = async () => {
     await logout();
@@ -35,14 +39,13 @@ export default function Navbar() {
                 Olá, {perfil?.nome || 'Usuário'}
               </span>
               
-              {/* Botão Dinâmico: Admin vai pro Painel, Cliente vai pros Pedidos */}
               {perfil?.role === 'admin' ? (
                 <Link to="/admin" className="hover:text-blue-400 transition-colors">Painel Admin</Link>
               ) : (
                 <Link to="/perfil" className="hover:text-blue-400 transition-colors">Meus Pedidos</Link>
               )}
 
-              <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition-colors">
+              <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition-colors cursor-pointer title='Sair'">
                 <LogOut size={20} />
               </button>
             </div>
@@ -53,18 +56,21 @@ export default function Navbar() {
             </Link>
           )}
 
-          <button 
-            onClick={openCart}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-md font-semibold transition-colors"
-          >
-            <ShoppingCart size={20} />
-            Carrinho ({cart.length})
-          </button>
+          {/* Botão do Carrinho - SÓ APARECE SE NÃO ESTIVER NA PÁGINA ADMIN */}
+          {!isAdminPage && (
+            <button 
+              onClick={openCart}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-md font-semibold transition-colors cursor-pointer"
+            >
+              <ShoppingCart size={20} />
+              Carrinho ({cart.length})
+            </button>
+          )}
         </div>
 
-        {/* Botão Mobile */}
+        {/* Botão Mobile (Hambúrguer) */}
         <button 
-          className="md:hidden z-50 p-2"
+          className="md:hidden z-50 p-2 cursor-pointer"
           onClick={() => setIsMenuMobileOpen(!isMenuMobileOpen)}
         >
           {isMenuMobileOpen ? <X size={28} /> : <Menu size={28} />}
@@ -72,7 +78,7 @@ export default function Navbar() {
 
       </div>
 
-      {/* Dropdown Mobile (Simplificado) */}
+      {/* Dropdown Mobile */}
       {isMenuMobileOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-gray-800 border-t border-gray-700 py-4 px-4 flex flex-col gap-4 shadow-xl">
           {!user && (
@@ -80,12 +86,16 @@ export default function Navbar() {
               Entrar na Conta
             </Link>
           )}
-          <button 
-            onClick={() => { openCart(); setIsMenuMobileOpen(false); }}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-3 rounded-md font-semibold w-full"
-          >
-            <ShoppingCart size={20} /> Carrinho ({cart.length})
-          </button>
+          
+          {/* Carrinho Mobile - SÓ APARECE SE NÃO ESTIVER NA PÁGINA ADMIN */}
+          {!isAdminPage && (
+            <button 
+              onClick={() => { openCart(); setIsMenuMobileOpen(false); }}
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-3 rounded-md font-semibold w-full cursor-pointer"
+            >
+              <ShoppingCart size={20} /> Carrinho ({cart.length})
+            </button>
+          )}
         </div>
       )}
     </header>

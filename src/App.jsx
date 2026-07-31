@@ -13,6 +13,7 @@ import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import { useFavoritosStore } from './store/favoritosStore';
+import Admin from './pages/Admin';
 
 export default function App() {
   // Puxa a função que checa o login
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/perfil" element={<Profile />} />
             <Route path="/cadastro" element={<Register />} />
             <Route path="/recuperar-senha" element={<ForgotPassword />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
         </main>
         <Footer />
