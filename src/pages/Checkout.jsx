@@ -11,16 +11,25 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [enderecosSalvos, setEnderecosSalvos] = useState([]);
+  const [salvarNovoEndereco, setSalvarNovoEndereco] = useState(false);
 
+  // Formulário completo
   const [formData, setFormData] = useState({
-    nome: perfil?.nome || '', email: user?.email || '', endereco: '', cidade: '', cep: ''
+    nome: perfil?.nome || '',
+    email: user?.email || '',
+    cep: '',
+    rua: '',
+    numero: '',
+    bairro: '',
+    cidade: '',
+    complemento: '',
+    titulo: 'Casa'
   });
 
   useEffect(() => {
     if (perfil?.nome) setFormData((prev) => ({ ...prev, nome: perfil.nome }));
     if (user?.email) setFormData((prev) => ({ ...prev, email: user.email }));
 
-    // Busca os endereços salvos do cliente
     async function fetchEnderecos() {
       if (!user) return;
       const { data } = await supabase.from('enderecos').select('*').eq('user_id', user.id);
@@ -29,23 +38,64 @@ export default function Checkout() {
     fetchEnderecos();
   }, [user, perfil]);
 
+  // Aplica um endereço salvo selecionado
   const handleSelecionarEnderecoSalvo = (e) => {
     const enderecoId = e.target.value;
-    if (!enderecoId) return;
+    
+    if (!enderecoId) {
+      // Limpa os campos para digitação manual
+      setFormData((prev) => ({
+        ...prev, cep: '', rua: '', numero: '', bairro: '', cidade: '', complemento: ''
+      }));
+      return;
+    }
 
     const selecionado = enderecosSalvos.find((end) => end.id === enderecoId);
     if (selecionado) {
-      setFormData({
-        ...formData,
-        endereco: `${selecionado.rua}, ${selecionado.numero}${selecionado.complemento ? ' (' + selecionado.complemento + ')' : ''} - ${selecionado.bairro}`,
-        cidade: selecionado.cidade,
+      setFormData((prev) => ({
+        ...prev,
         cep: selecionado.cep,
-      });
+        rua: selecionado.rua,
+        numero: selecionado.numero,
+        bairro: selecionado.bairro,
+        cidade: selecionado.cidade,
+        complemento: selecionado.complemento || '',
+      }));
       toast.success(`Endereço "${selecionado.titulo}" aplicado!`);
     }
   };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  // Busca do CEP no Checkout
+  const buscarCEP = async (cepBuscado) => {
+    const cepLimpo = cepBuscado.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        toast.error('CEP não encontrado. Verifique o número digitado.');
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        rua: data.logradouro || '',
+        bairro: data.bairro || '',
+        cidade: `${data.localidade} / ${data.uf}`,
+        cep: data.cep
+      }));
+      
+      toast.success('Endereço encontrado!', { icon: '📍' });
+      
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast.error('Erro de conexão ao buscar o CEP.');
+    }
+  };
 
   const parsePreco = (preco) => {
     if (typeof preco === 'number') return preco;
@@ -72,8 +122,24 @@ export default function Checkout() {
     setLoading(true);
 
     try {
-      const enderecoCompleto = `${formData.endereco}, ${formData.cidade} - CEP: ${formData.cep}`;
+      // Formata a string completa de entrega para a tabela de pedidos
+      const enderecoCompleto = `${formData.rua}, ${formData.numero}${formData.complemento ? ' (' + formData.complemento + ')' : ''} - ${formData.bairro}, ${formData.cidade} - CEP: ${formData.cep}`;
 
+      // 1. Opcional: Se o usuário marcou para salvar o endereço novo no perfil dele
+      if (salvarNovoEndereco) {
+        await supabase.from('enderecos').insert([{
+          user_id: user.id,
+          titulo: formData.titulo || 'Novo Endereço',
+          rua: formData.rua,
+          numero: formData.numero,
+          bairro: formData.bairro,
+          cidade: formData.cidade,
+          cep: formData.cep,
+          complemento: formData.complemento,
+        }]);
+      }
+
+      // 2. Salva o pedido principal
       const { data: pedido, error: errorPedido } = await supabase
         .from('pedidos')
         .insert([{ user_id: user.id, status: 'Em Impressão 3D', total: totalCalculado, endereco_entrega: enderecoCompleto }])
@@ -82,6 +148,7 @@ export default function Checkout() {
 
       if (errorPedido) throw errorPedido;
 
+      // 3. Salva os itens do pedido
       const itensParaInserir = cart.map((item) => ({
         pedido_id: pedido.id,
         nome_produto: item.nome,
@@ -135,7 +202,7 @@ export default function Checkout() {
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <label className="block text-sm font-bold text-blue-800 mb-2">Usar um Endereço Salvo:</label>
             <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-2 border border-blue-300 rounded bg-white font-medium text-gray-700 outline-none">
-              <option value="">-- Selecione para preencher automaticamente --</option>
+              <option value="">-- Digitar outro endereço --</option>
               {enderecosSalvos.map((end) => (
                 <option key={end.id} value={end.id}>{end.titulo} - {end.rua}, {end.numero}</option>
               ))}
@@ -154,19 +221,62 @@ export default function Checkout() {
               <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Endereço (Rua, Número, Bairro)</label>
-            <input required type="text" name="endereco" value={formData.endereco} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+              <input 
+                required 
+                type="text" 
+                name="cep" 
+                maxLength="9"
+                placeholder="00000-000"
+                value={formData.cep} 
+                onChange={handleChange} 
+                onBlur={(e) => buscarCEP(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" 
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cidade / Estado</label>
               <input required type="text" name="cidade" value={formData.cidade} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-              <input required type="text" name="cep" value={formData.cep} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rua / Avenida</label>
+              <input required type="text" name="rua" value={formData.rua} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+              <input required type="text" name="numero" value={formData.numero} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+              <input required type="text" name="bairro" value={formData.bairro} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Complemento (Opcional)</label>
+              <input type="text" name="complemento" placeholder="Apt, Bloco..." value={formData.complemento} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+
+          {/* Opção de salvar no perfil caso seja um endereço digitado manualmente */}
+          <div className="pt-2 flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="salvarEndereco" 
+              checked={salvarNovoEndereco} 
+              onChange={(e) => setSalvarNovoEndereco(e.target.checked)} 
+              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+            />
+            <label htmlFor="salvarEndereco" className="text-sm font-medium text-gray-700 cursor-pointer">
+              Salvar este novo endereço no meu perfil para próximas compras
+            </label>
           </div>
         </form>
       </div>

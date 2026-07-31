@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Package, Truck, CheckCircle2, Clock, Printer, User, MapPin, Key, Plus, Trash2, Edit3 } from 'lucide-react';
+import { Package, Truck, CheckCircle2, Clock, Printer, User, MapPin, Key, Plus, Trash2, Edit3, Heart } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
+import ProductCard from '../components/ProductCard';
 
 export default function Profile() {
   const { user, perfil, checkUser } = useAuthStore();
   
   // Controle de Abas: 'pedidos' | 'dados' | 'enderecos'
   const [abaAtiva, setAbaAtiva] = useState('pedidos');
+
+  const [produtosFavoritos, setProdutosFavoritos] = useState([]);
+  const [loadingFavoritos, setLoadingFavoritos] = useState(true);
 
   // Estados de Dados Pessoais
   const [nome, setNome] = useState(perfil?.nome || '');
@@ -39,7 +43,6 @@ export default function Profile() {
     { label: 'Entregue', icon: CheckCircle2 },
   ];
 
-  // Sincroniza os estados caso o perfil demore a carregar
   useEffect(() => {
     if (perfil) {
       setNome(perfil.nome || '');
@@ -47,7 +50,6 @@ export default function Profile() {
     }
   }, [perfil]);
 
-  // Carrega os Pedidos e Endereços
   useEffect(() => {
     if (!user) return;
 
@@ -71,12 +73,53 @@ export default function Profile() {
         .order('created_at', { ascending: false });
       setEnderecos(dataEnderecos || []);
       setLoadingEnderecos(false);
+
+      // Favoritos
+      setLoadingFavoritos(true);
+      // Aqui usamos um "join" do Supabase para trazer a linha de favoritos E os dados da tabela produtos
+      const { data: dataFavoritos } = await supabase
+        .from('favoritos')
+        .select('*, produtos(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (dataFavoritos) {
+        // Extrai apenas os objetos "produtos" da resposta
+        setProdutosFavoritos(dataFavoritos.map(fav => fav.produtos));
+      }
+      setLoadingFavoritos(false);
     }
 
     fetchData();
   }, [user]);
 
-  // Salvar Nome / Telefone
+  // BUSCA AUTOMÁTICA DE CEP NO PERFIL
+  const buscarCEPPerfil = async (cepBuscado) => {
+    const cepLimpo = cepBuscado.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        toast.error('CEP não encontrado.');
+        return;
+      }
+
+      setNovoEndereco((prev) => ({
+        ...prev,
+        rua: data.logradouro || '',
+        bairro: data.bairro || '',
+        cidade: `${data.localidade} / ${data.uf}`,
+        cep: data.cep
+      }));
+      toast.success('Endereço encontrado!', { icon: '📍' });
+    } catch (error) {
+      toast.error('Erro ao buscar o CEP.');
+    }
+  };
+
   const handleSalvarPerfil = async (e) => {
     e.preventDefault();
     setSalvandoDados(true);
@@ -88,7 +131,7 @@ export default function Profile() {
 
       if (error) throw error;
 
-      await checkUser(); // Atualiza Zustand
+      await checkUser();
       toast.success('Dados atualizados com sucesso!');
     } catch (err) {
       toast.error('Erro ao atualizar dados.');
@@ -98,7 +141,6 @@ export default function Profile() {
     }
   };
 
-  // Alterar Senha
   const handleAlterarSenha = async (e) => {
     e.preventDefault();
     if (novaSenha.length < 6) {
@@ -120,7 +162,6 @@ export default function Profile() {
     }
   };
 
-  // Adicionar Endereço
   const handleAdicionarEndereco = async (e) => {
     e.preventDefault();
     setSalvandoEndereco(true);
@@ -143,7 +184,6 @@ export default function Profile() {
     }
   };
 
-  // Remover Endereço
   const handleRemoverEndereco = async (id) => {
     try {
       const { error } = await supabase.from('enderecos').delete().eq('id', id);
@@ -199,6 +239,15 @@ export default function Profile() {
           }`}
         >
           <MapPin size={20} /> Endereços Salvos
+        </button>
+
+        <button
+          onClick={() => setAbaAtiva('favoritos')}
+          className={`pb-3 px-4 font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+            abaAtiva === 'favoritos' ? 'border-red-500 text-red-500' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Heart size={20} /> Meus Favoritos
         </button>
       </div>
 
@@ -257,8 +306,6 @@ export default function Profile() {
       {/* ABA 2: MEUS DADOS */}
       {abaAtiva === 'dados' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Formulário de Perfil */}
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <User size={20} className="text-blue-600" /> Informações Pessoais
@@ -294,7 +341,6 @@ export default function Profile() {
             </form>
           </div>
 
-          {/* Troca de Senha */}
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <Key size={20} className="text-blue-600" /> Alterar Senha
@@ -320,7 +366,6 @@ export default function Profile() {
               </button>
             </form>
           </div>
-
         </div>
       )}
 
@@ -349,8 +394,10 @@ export default function Profile() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
                   <input
                     type="text"
+                    placeholder="00000-000"
                     value={novoEndereco.cep}
                     onChange={(e) => setNovoEndereco({ ...novoEndereco, cep: e.target.value })}
+                    onBlur={(e) => buscarCEPPerfil(e.target.value)}
                     required
                     className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                   />
@@ -423,7 +470,6 @@ export default function Profile() {
             </form>
           </div>
 
-          {/* Lista de Endereços Cadastrados */}
           <div className="space-y-4">
             <h4 className="text-md font-bold text-gray-700">Seus Endereços Cadastrados:</h4>
             {loadingEnderecos ? (
@@ -454,7 +500,29 @@ export default function Profile() {
               </div>
             )}
           </div>
+        
+        
+        </div>
+      )}
 
+      {/* ABA 4: MEUS FAVORITOS */}
+      {abaAtiva === 'favoritos' && (
+        <div className="space-y-6">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Heart size={20} className="text-red-500" /> Lista de Desejos
+          </h3>
+          
+          {loadingFavoritos ? (
+            <p className="text-gray-500">Carregando seus favoritos...</p>
+          ) : produtosFavoritos.length === 0 ? (
+            <p className="text-gray-500 bg-white p-8 rounded border text-center">Você ainda não salvou nenhum produto aos favoritos.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {produtosFavoritos.map((produto) => (
+                <ProductCard key={produto.id} produto={produto} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

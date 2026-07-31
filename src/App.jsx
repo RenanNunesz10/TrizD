@@ -12,15 +12,22 @@ import { useAuthStore } from './store/authStore';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import { useFavoritosStore } from './store/favoritosStore';
 
 export default function App() {
   // Puxa a função que checa o login
   const checkUser = useAuthStore((state) => state.checkUser);
+  const user = useAuthStore((state) => state.user);
+  const carregarFavoritos = useFavoritosStore((state) => state.carregarFavoritos);
 
-  // Roda uma única vez quando o site abre
   useEffect(() => {
     checkUser();
   }, [checkUser]);
+
+  // NOVO: Sempre que o usuário logar/deslogar, atualiza a lista de favoritos
+  useEffect(() => {
+    carregarFavoritos(user?.id);
+  }, [user, carregarFavoritos]);
 
   return (
     <Router>
