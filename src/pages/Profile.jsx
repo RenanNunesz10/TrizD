@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, Truck, CheckCircle2, Clock, Printer, User, MapPin, Key, Plus, Trash2, Edit3, Heart } from 'lucide-react';
+import { Package, Truck, CheckCircle2, Clock, Printer, User, MapPin, Key, Plus, Trash2, Edit3, Heart, Star } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -8,11 +8,8 @@ import ProductCard from '../components/ProductCard';
 export default function Profile() {
   const { user, perfil, checkUser } = useAuthStore();
   
-  // Controle de Abas: 'pedidos' | 'dados' | 'enderecos'
+  // Controle de Abas: 'pedidos' | 'dados' | 'enderecos' | 'favoritos'
   const [abaAtiva, setAbaAtiva] = useState('pedidos');
-
-  const [produtosFavoritos, setProdutosFavoritos] = useState([]);
-  const [loadingFavoritos, setLoadingFavoritos] = useState(true);
 
   // Estados de Dados Pessoais
   const [nome, setNome] = useState(perfil?.nome || '');
@@ -23,9 +20,16 @@ export default function Profile() {
   const [novaSenha, setNovaSenha] = useState('');
   const [salvandoSenha, setSalvandoSenha] = useState(false);
 
-  // Estados de Pedidos
+  // Estados de Pedidos e Avaliações
   const [pedidos, setPedidos] = useState([]);
+  const [avaliacoes, setAvaliacoes] = useState([]);
   const [loadingPedidos, setLoadingPedidos] = useState(true);
+
+  // Formulário de Avaliação Aberto
+  const [itemEmAvaliacao, setItemEmAvaliacao] = useState(null); // { pedidoId, nomeProduto }
+  const [notaEstrelas, setNotaEstrelas] = useState(5);
+  const [comentarioTexto, setComentarioTexto] = useState('');
+  const [enviandoAvaliacao, setEnviandoAvaliacao] = useState(false);
 
   // Estados de Endereços
   const [enderecos, setEnderecos] = useState([]);
@@ -34,6 +38,10 @@ export default function Profile() {
     titulo: 'Casa', rua: '', numero: '', complemento: '', bairro: '', cidade: '', cep: ''
   });
   const [salvandoEndereco, setSalvandoEndereco] = useState(false);
+
+  // Estados de Favoritos
+  const [produtosFavoritos, setProdutosFavoritos] = useState([]);
+  const [loadingFavoritos, setLoadingFavoritos] = useState(true);
 
   const etapasStatus = [
     { label: 'Aguardando Pagamento', icon: Clock },
@@ -62,6 +70,14 @@ export default function Profile() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       setPedidos(dataPedidos || []);
+
+      // Avaliações
+      const { data: dataAvaliacoes } = await supabase
+        .from('avaliacoes')
+        .select('*')
+        .eq('user_id', user.id);
+      setAvaliacoes(dataAvaliacoes || []);
+
       setLoadingPedidos(false);
 
       // Endereços
@@ -76,7 +92,6 @@ export default function Profile() {
 
       // Favoritos
       setLoadingFavoritos(true);
-      // Aqui usamos um "join" do Supabase para trazer a linha de favoritos E os dados da tabela produtos
       const { data: dataFavoritos } = await supabase
         .from('favoritos')
         .select('*, produtos(*)')
@@ -84,8 +99,7 @@ export default function Profile() {
         .order('created_at', { ascending: false });
         
       if (dataFavoritos) {
-        // Extrai apenas os objetos "produtos" da resposta
-        setProdutosFavoritos(dataFavoritos.map(fav => fav.produtos));
+        setProdutosFavoritos(dataFavoritos.map(fav => fav.produtos).filter(Boolean));
       }
       setLoadingFavoritos(false);
     }
@@ -93,7 +107,39 @@ export default function Profile() {
     fetchData();
   }, [user]);
 
-  // BUSCA AUTOMÁTICA DE CEP NO PERFIL
+  // Enviar Avaliação
+  const handleEnviarAvaliacao = async (e) => {
+    e.preventDefault();
+    if (!itemEmAvaliacao) return;
+
+    setEnviandoAvaliacao(true);
+    try {
+      const { data, error } = await supabase
+        .from('avaliacoes')
+        .insert([{
+          user_id: user.id,
+          pedido_id: itemEmAvaliacao.pedidoId,
+          nome_produto: itemEmAvaliacao.nomeProduto,
+          nota: notaEstrelas,
+          comentario: comentarioTexto
+        }])
+        .select();
+
+      if (error) throw error;
+
+      toast.success('Avaliação enviada com sucesso! Obrigado pelo feedback. ⭐');
+      setAvaliacoes([...avaliacoes, data[0]]);
+      setItemEmAvaliacao(null);
+      setComentarioTexto('');
+      setNotaEstrelas(5);
+    } catch (err) {
+      toast.error('Erro ao enviar avaliação.');
+      console.error(err);
+    } finally {
+      setEnviandoAvaliacao(false);
+    }
+  };
+
   const buscarCEPPerfil = async (cepBuscado) => {
     const cepLimpo = cepBuscado.replace(/\D/g, '');
     if (cepLimpo.length !== 8) return;
@@ -263,6 +309,8 @@ export default function Profile() {
           ) : (
             pedidos.map((pedido) => {
               const etapaAtual = getEtapaIndex(pedido.status);
+              const isEntregue = pedido.status === 'Entregue';
+
               return (
                 <div key={pedido.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between border-b pb-4 gap-2">
@@ -279,6 +327,7 @@ export default function Profile() {
                     </div>
                   </div>
 
+                  {/* Progresso do Pedido */}
                   <div className="py-2">
                     <p className="text-sm font-semibold text-gray-700 mb-4">Status da Produção:</p>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -296,6 +345,105 @@ export default function Profile() {
                       })}
                     </div>
                   </div>
+
+                  {/* Lista de Itens com opção de Avaliação caso esteja Entregue */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Itens do Pedido:</h4>
+                    <div className="divide-y divide-gray-200 space-y-3">
+                      {pedido.itens_pedido?.map((item) => {
+                        // Verifica se o item já tem avaliação cadastrada
+                        const avaliacaoExistente = avaliacoes.find(
+                          (a) => a.pedido_id === pedido.id && a.nome_produto === item.nome_produto
+                        );
+
+                        const emEdicao = itemEmAvaliacao?.pedidoId === pedido.id && itemEmAvaliacao?.nomeProduto === item.nome_produto;
+
+                        return (
+                          <div key={item.id} className="pt-3 first:pt-0">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="font-semibold text-gray-800">{item.nome_produto}</p>
+                                <p className="text-sm text-gray-500">R$ {Number(item.preco_unitario).toFixed(2).replace('.', ',')}</p>
+                              </div>
+
+                              {/* Botão de Avaliar para Pedidos Entregues */}
+                              {isEntregue && !avaliacaoExistente && !emEdicao && (
+                                <button
+                                  onClick={() => setItemEmAvaliacao({ pedidoId: pedido.id, nomeProduto: item.nome_produto })}
+                                  className="flex items-center gap-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded transition cursor-pointer"
+                                >
+                                  <Star size={14} className="fill-white" /> Avaliar Produto
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Exibe a Avaliação que já foi feita */}
+                            {avaliacaoExistente && (
+                              <div className="mt-2 p-3 bg-amber-50 rounded border border-amber-200 text-sm">
+                                <div className="flex items-center gap-1 text-amber-500 font-bold mb-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star key={i} size={14} className={i < avaliacaoExistente.nota ? 'fill-amber-400' : 'text-gray-300'} />
+                                  ))}
+                                  <span className="ml-2 text-xs text-amber-800">Sua Avaliação</span>
+                                </div>
+                                {avaliacaoExistente.comentario && (
+                                  <p className="text-gray-700 text-xs italic">"{avaliacaoExistente.comentario}"</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Form de Avaliação Aberto */}
+                            {emEdicao && (
+                              <form onSubmit={handleEnviarAvaliacao} className="mt-3 p-4 bg-white rounded-lg border border-amber-300 space-y-3">
+                                <h5 className="text-sm font-bold text-gray-800">Avaliar "{item.nome_produto}"</h5>
+                                
+                                {/* Seletor de Estrelas */}
+                                <div className="flex gap-1">
+                                  {[1, 2, 3, 4, 5].map((estrela) => (
+                                    <button
+                                      type="button"
+                                      key={estrela}
+                                      onClick={() => setNotaEstrelas(estrela)}
+                                      className="p-1 cursor-pointer focus:outline-none"
+                                    >
+                                      <Star size={24} className={estrela <= notaEstrelas ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <textarea
+                                  placeholder="Conte o que achou da qualidade do acabamento, resistência da peça..."
+                                  value={comentarioTexto}
+                                  onChange={(e) => setComentarioTexto(e.target.value)}
+                                  className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                                  rows="2"
+                                />
+
+                                <div className="flex gap-2">
+                                  <button
+                                    type="submit"
+                                    disabled={enviandoAvaliacao}
+                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2 px-4 rounded cursor-pointer disabled:bg-gray-300"
+                                  >
+                                    {enviandoAvaliacao ? 'Enviando...' : 'Publicar Avaliação'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setItemEmAvaliacao(null)}
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold py-2 px-4 rounded cursor-pointer"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                 </div>
               );
             })
@@ -372,8 +520,6 @@ export default function Profile() {
       {/* ABA 3: ENDEREÇOS SALVOS */}
       {abaAtiva === 'enderecos' && (
         <div className="space-y-8">
-          
-          {/* Formulário Novo Endereço */}
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <Plus size={20} className="text-blue-600" /> Adicionar Novo Endereço
@@ -500,8 +646,6 @@ export default function Profile() {
               </div>
             )}
           </div>
-        
-        
         </div>
       )}
 
