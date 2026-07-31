@@ -1,18 +1,28 @@
+import { useEffect } from 'react'; // IMPORTAÇÃO NOVA
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // IMPORTAÇÃO NOVO
+import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
-import CartDrawer from './components/CartDrawer';
 import Checkout from './pages/Checkout';
+import Login from './pages/Login';
+import CartDrawer from './components/CartDrawer';
+import { useAuthStore } from './store/authStore';
+import Profile from './pages/Profile';
 
 export default function App() {
+  // Puxa a função que checa o login
+  const checkUser = useAuthStore((state) => state.checkUser);
+
+  // Roda uma única vez quando o site abre
+  useEffect(() => {
+    checkUser();
+  }, [checkUser]);
+
   return (
     <Router>
-      {/* Componente dos avisos bonitos */}
       <Toaster position="bottom-right" />
-      {/* A gaveta fica disponível em todas as telas */}
       <CartDrawer /> 
       
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -22,6 +32,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/produto/:id" element={<ProductDetails />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/perfil" element={<Profile />} />
           </Routes>
         </main>
         <Footer />
