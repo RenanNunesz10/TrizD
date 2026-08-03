@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // <-- Adicionamos o useLocation
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingCart, User, LogOut } from 'lucide-react';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 
 export default function Navbar() {
-  const { cart, openCart } = useCartStore();
+  // CORREÇÃO 1: Trocamos "openCart" por "setIsOpen"
+  const { cart, setIsOpen } = useCartStore();
   const { user, perfil, logout } = useAuthStore();
   const [isMenuMobileOpen, setIsMenuMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ export default function Navbar() {
                 <Link to="/perfil" className="hover:text-blue-400 transition-colors">Meus Pedidos</Link>
               )}
 
-              <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition-colors cursor-pointer title='Sair'">
+              <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition-colors cursor-pointer" title="Sair">
                 <LogOut size={20} />
               </button>
             </div>
@@ -59,7 +60,8 @@ export default function Navbar() {
           {/* Botão do Carrinho - SÓ APARECE SE NÃO ESTIVER NA PÁGINA ADMIN */}
           {!isAdminPage && (
             <button 
-              onClick={openCart}
+              // CORREÇÃO 2: Chamamos a função setIsOpen(true)
+              onClick={() => setIsOpen(true)}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-md font-semibold transition-colors cursor-pointer"
             >
               <ShoppingCart size={20} />
@@ -90,7 +92,8 @@ export default function Navbar() {
           {/* Carrinho Mobile - SÓ APARECE SE NÃO ESTIVER NA PÁGINA ADMIN */}
           {!isAdminPage && (
             <button 
-              onClick={() => { openCart(); setIsMenuMobileOpen(false); }}
+              // CORREÇÃO 3: Adicionamos setIsOpen(true) aqui também
+              onClick={() => { setIsOpen(true); setIsMenuMobileOpen(false); }}
               className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 px-5 py-3 rounded-md font-semibold w-full cursor-pointer"
             >
               <ShoppingCart size={20} /> Carrinho ({cart.length})

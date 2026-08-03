@@ -103,7 +103,8 @@ export default function Checkout() {
     return isNaN(num) ? 0 : num;
   };
 
-  const totalCalculado = cart.reduce((acc, item) => acc + parsePreco(item.preco), 0);
+  // ATUALIZADO: Multiplica o preço pela quantidade do item
+  const totalCalculado = cart.reduce((acc, item) => acc + (parsePreco(item.preco) * (item.quantidade || 1)), 0);
 
   const handleFinalizarPedido = async (e) => {
     e.preventDefault();
@@ -148,11 +149,12 @@ export default function Checkout() {
 
       if (errorPedido) throw errorPedido;
 
-      // 3. Salva os itens do pedido
+      // 3. Salva os itens do pedido (ATUALIZADO COM COR E QUANTIDADE)
       const itensParaInserir = cart.map((item) => ({
         pedido_id: pedido.id,
-        nome_produto: item.nome,
+        nome_produto: item.cor_escolhida ? `${item.nome} (${item.cor_escolhida})` : item.nome,
         preco_unitario: parsePreco(item.preco),
+        quantidade: item.quantidade || 1
       }));
 
       const { error: errorItens } = await supabase.from('itens_pedido').insert(itensParaInserir);
@@ -174,7 +176,7 @@ export default function Checkout() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Seu carrinho está vazio</h2>
-        <button onClick={() => navigate('/')} className="text-blue-600 hover:underline">Voltar para a loja</button>
+        <button onClick={() => navigate('/')} className="text-blue-600 hover:underline cursor-pointer">Voltar para a loja</button>
       </div>
     );
   }
@@ -185,15 +187,15 @@ export default function Checkout() {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Acesso Restrito 🔒</h2>
         <p className="text-gray-600 mb-6">Você precisa estar logado para acessar o pagamento.</p>
         <div className="flex gap-4 justify-center">
-          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">Fazer Login</button>
-          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">Criar Conta</button>
+          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition cursor-pointer">Fazer Login</button>
+          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition cursor-pointer">Criar Conta</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row">
+    <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row mt-8">
       <div className="w-full md:w-2/3 p-6 md:p-10">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Dados de Entrega</h2>
 
@@ -201,7 +203,7 @@ export default function Checkout() {
         {enderecosSalvos.length > 0 && (
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <label className="block text-sm font-bold text-blue-800 mb-2">Usar um Endereço Salvo:</label>
-            <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-2 border border-blue-300 rounded bg-white font-medium text-gray-700 outline-none">
+            <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-2 border border-blue-300 rounded bg-white font-medium text-gray-700 outline-none cursor-pointer">
               <option value="">-- Digitar outro endereço --</option>
               {enderecosSalvos.map((end) => (
                 <option key={end.id} value={end.id}>{end.titulo} - {end.rua}, {end.numero}</option>
@@ -283,21 +285,39 @@ export default function Checkout() {
 
       <div className="w-full md:w-1/3 bg-gray-50 p-6 md:p-10 border-t md:border-t-0 md:border-l border-gray-200">
         <h3 className="text-xl font-bold text-gray-800 mb-6">Resumo do Pedido</h3>
-        <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+        
+        <div className="space-y-4 mb-6 max-h-80 overflow-y-auto custom-scrollbar">
           {cart.map((item, index) => (
-            <div key={index} className="flex justify-between text-sm">
-              <span className="text-gray-600 truncate mr-4">{item.nome}</span>
-              <span className="text-gray-900 font-medium whitespace-nowrap">{item.preco}</span>
+            <div key={index} className="flex justify-between items-start text-sm">
+              <div className="flex flex-col flex-1 pr-2">
+                <span className="text-gray-800 font-bold">{item.nome}</span>
+                
+                {/* ATUALIZADO: Exibe a cor com a bolinha no resumo */}
+                {item.cor_escolhida ? (
+                  <span className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-1">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: item.cor_hex || '#000' }} />
+                    {item.cor_escolhida} ({item.quantidade || 1}x)
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-500 mt-1">({item.quantidade || 1}x)</span>
+                )}
+              </div>
+              
+              <span className="text-gray-900 font-bold whitespace-nowrap">
+                R$ {(parsePreco(item.preco) * (item.quantidade || 1)).toFixed(2).replace('.', ',')}
+              </span>
             </div>
           ))}
         </div>
+
         <div className="border-t border-gray-200 pt-4 mb-6">
-          <div className="flex justify-between items-center font-bold text-lg">
+          <div className="flex justify-between items-center font-bold text-xl">
             <span>Total:</span>
             <span className="text-blue-600">R$ {totalCalculado.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
-        <button form="checkout-form" type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer disabled:bg-gray-400">
+
+        <button form="checkout-form" type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-colors cursor-pointer disabled:bg-gray-400 shadow-lg shadow-green-600/20">
           {loading ? 'Processando...' : 'Confirmar e Pagar'}
         </button>
       </div>

@@ -1,85 +1,134 @@
-import { X, Trash2 } from 'lucide-react';
-import { useCartStore } from '../store/cartStore';
-import { useAuthStore } from '../store/authStore';
+import { X, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { useCartStore } from '../store/cartStore';
 
 export default function CartDrawer() {
-  const { cart, isCartOpen, closeCart, removeFromCart } = useCartStore();
-  const { user } = useAuthStore();
   const navigate = useNavigate();
-  
+  const { cart, isOpen, setIsOpen, removeFromCart, updateQuantity } = useCartStore();
+
+  const total = cart.reduce((acc, item) => acc + Number(item.preco) * item.quantidade, 0);
+
+  if (!isOpen) return null;
 
   return (
-    <>
-      {/* Fundo escuro que cobre a tela (Overlay) */}
-      {isCartOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 transition-opacity"
-          onClick={closeCart}
-        />
-      )}
-
-      {/* A Gaveta em si */}
+    <div className="fixed inset-0 z-50 overflow-hidden animate-fade-in">
+      {/* Fundo escuro */}
       <div 
-        className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${
-          isCartOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="p-4 flex justify-between items-center border-b">
-          <h2 className="text-xl font-bold text-gray-800">Seu Carrinho</h2>
-          <button onClick={closeCart} className="p-2 hover:bg-gray-100 rounded-full">
-            <X size={24} className="text-gray-600" />
-          </button>
-        </div>
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+        onClick={() => setIsOpen(false)}
+      />
 
-        <div className="flex-grow overflow-y-auto p-4">
-          {cart.length === 0 ? (
-            <div className="text-center text-gray-500 mt-10">
-              Seu carrinho está vazio.
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col">
+          
+          {/* Cabeçalho */}
+          <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={20} className="text-blue-600" />
+              <h2 className="text-lg font-black text-slate-800">Seu Carrinho</h2>
+              <span className="bg-blue-100 text-blue-700 font-bold text-xs px-2.5 py-0.5 rounded-full">
+                {cart.length}
+              </span>
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {cart.map((item, index) => (
-                <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                  <div>
-                    <h4 className="font-semibold text-gray-800">{item.nome}</h4>
-                    <p className="text-blue-600 font-medium">{item.preco}</p>
-                  </div>
-                  <button 
-                    onClick={() => removeFromCart(item.id)}
-                    className="text-red-500 hover:text-red-700 p-2"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {cart.length > 0 && (
-          <div className="p-4 border-t bg-gray-50">
             <button 
-              onClick={() => {
-                closeCart(); // Fecha a gaveta primeiro
-                
-                if (!user) {
-                  // Se não estiver logado, avisa e manda pro login
-                  toast('Faça login ou crie uma conta para finalizar a compra.', { icon: '🔒' });
-                  navigate('/login');
-                } else {
-                  // Se estiver logado, vai pro checkout normalmente
-                  navigate('/checkout');
-                }
-              }}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors cursor-pointer"
+              onClick={() => setIsOpen(false)} 
+              className="p-2 rounded-full hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
             >
-              Finalizar Compra
+              <X size={20} />
             </button>
           </div>
-        )}
+
+          {/* Lista de Itens */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+            {cart.length === 0 ? (
+              <div className="text-center py-16 text-slate-400 space-y-3">
+                <ShoppingBag size={48} className="mx-auto opacity-30" />
+                <p className="font-bold text-slate-600">Seu carrinho está vazio</p>
+                <p className="text-xs">Explore nossa vitrine e adicione peças incríveis.</p>
+              </div>
+            ) : (
+              cart.map((item, index) => (
+                <div key={`${item.id}-${item.cor_escolhida}-${index}`} className="flex gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                  <img 
+                    src={item.imagem_url || '/placeholder.png'} 
+                    alt={item.nome} 
+                    className="w-16 h-16 object-contain rounded-xl bg-white p-1 border border-slate-100"
+                  />
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm truncate">{item.nome}</h4>
+                      
+                      {/* Bbadge da Cor Escolhida */}
+                      {item.cor_escolhida && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span 
+                            className="w-3 h-3 rounded-full border border-slate-300 shadow-sm inline-block" 
+                            style={{ backgroundColor: item.cor_hex || '#000000' }}
+                          />
+                          <span className="text-xs text-slate-500 font-medium">
+                            {item.cor_escolhida}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-black text-blue-600 text-sm">
+                        R$ {Number(item.preco).toFixed(2).replace('.', ',')}
+                      </span>
+
+                      <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                        <button 
+                          onClick={() => updateQuantity(index, item.quantidade - 1)}
+                          className="text-slate-400 hover:text-slate-700 font-bold px-1"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-bold text-slate-800">{item.quantidade}</span>
+                        <button 
+                          onClick={() => updateQuantity(index, item.quantidade + 1)}
+                          className="text-slate-400 hover:text-slate-700 font-bold px-1"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => removeFromCart(index)}
+                    className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Rodapé com Total e Botão */}
+          {cart.length > 0 && (
+            <div className="p-6 bg-slate-50 border-t border-slate-100 space-y-4">
+              <div className="flex justify-between items-center text-slate-800">
+                <span className="font-bold">Total:</span>
+                <span className="text-2xl font-black text-blue-600">
+                  R$ {total.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/checkout');
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+              >
+                Finalizar Compra <ArrowRight size={18} />
+              </button>
+            </div>
+          )}
+
+        </div>
       </div>
-    </>
+    </div>
   );
 }
