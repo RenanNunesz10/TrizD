@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, Truck, Printer, CheckCircle2, Clock, Search, Send, X } from 'lucide-react';
+import { Package, Truck, Printer, CheckCircle2, Clock, Search, Send, X, LayoutGrid, List } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,9 @@ export default function Pedidos() {
   const [busca, setBusca] = useState('');
   const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
   const [codigosRastreio, setCodigosRastreio] = useState({});
+  
+  // NOVO: Controle de visualização (kanban ou lista)
+  const [modoVisao, setModoVisao] = useState('kanban');
 
   const listaStatus = ['Aguardando Pagamento', 'Em Impressão 3D', 'Acabamento & Pintura', 'Enviado', 'Entregue'];
 
@@ -46,6 +49,11 @@ export default function Pedidos() {
     if (!error) toast.success('Rastreio salvo!');
   };
 
+  // Filtra os pedidos com base na busca
+  const pedidosFiltrados = pedidos.filter(p => 
+    p.id.includes(busca) || p.endereco_entrega.toLowerCase().includes(busca.toLowerCase())
+  );
+
   return (
     <div className="space-y-8 animate-fade-in w-full">
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-8 rounded-3xl shadow-lg flex justify-between items-center">
@@ -56,55 +64,131 @@ export default function Pedidos() {
       </div>
 
       <div className="space-y-6">
-        <div className="relative max-w-md">
-          <input type="text" placeholder="Buscar pedido por código ou endereço..." value={busca} onChange={e => setBusca(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-          <Search className="absolute left-4 top-3.5 text-slate-400" size={18}/>
+        {/* BARRA DE BUSCA E CONTROLES DE VISUALIZAÇÃO */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="relative w-full max-w-md">
+            <input type="text" placeholder="Buscar pedido por código ou endereço..." value={busca} onChange={e => setBusca(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" />
+            <Search className="absolute left-4 top-3.5 text-slate-400" size={18}/>
+          </div>
+
+          <div className="flex bg-slate-200/60 p-1 rounded-xl w-full sm:w-auto">
+            <button onClick={() => setModoVisao('kanban')} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${modoVisao === 'kanban' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <LayoutGrid size={16}/> <span className="hidden sm:inline">Kanban</span>
+            </button>
+            <button onClick={() => setModoVisao('lista')} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${modoVisao === 'lista' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <List size={16}/> <span className="hidden sm:inline">Lista</span>
+            </button>
+          </div>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-slate-500 animate-pulse">Carregando quadro...</div>
+          <div className="text-center py-12 text-slate-500 animate-pulse">Carregando pedidos...</div>
         ) : (
-          <div className="flex gap-6 overflow-x-auto pb-6 snap-x w-full custom-scrollbar">
-            {listaStatus.map(status => {
-              const pedidosColuna = pedidos.filter(p => p.status === status && (p.id.includes(busca) || p.endereco_entrega.toLowerCase().includes(busca.toLowerCase())));
-              return (
-                <div key={status} className="min-w-[320px] max-w-[320px] bg-slate-100/50 p-4 rounded-3xl border border-slate-200 shrink-0 snap-start flex flex-col max-h-[70vh]">
-                  <div className="flex justify-between items-center mb-4 px-2">
-                    <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wider">{status}</h4>
-                    <span className="bg-white border border-slate-200 text-slate-600 text-xs font-black px-2.5 py-1 rounded-full shadow-sm">{pedidosColuna.length}</span>
-                  </div>
-                  <div className="space-y-3 overflow-y-auto pr-1 flex-grow custom-scrollbar">
-                    {pedidosColuna.map(pedido => (
-                      <div key={pedido.id} onClick={() => setPedidoSelecionado(pedido)} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md hover:border-blue-400 transition-all group">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">#{pedido.id.slice(0,6)}</span>
-                          <span className="text-xs text-slate-400 font-medium flex items-center gap-1"><Clock size={12}/> {new Date(pedido.created_at).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})}</span>
-                        </div>
-                        <div className="text-sm text-slate-700 mb-4 font-medium flex items-center gap-2">
-                          <Package size={14} className="text-slate-400" />
-                          {pedido.itens_pedido?.length} {pedido.itens_pedido?.length === 1 ? 'item a imprimir' : 'itens a imprimir'}
-                        </div>
-                        <div className="flex justify-between pt-3 border-t border-slate-100 items-center">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</span>
-                          <span className="font-black text-slate-800">R$ {Number(pedido.total).toFixed(2).replace('.', ',')}</span>
-                        </div>
+          <>
+            {/* ================= VISUALIZAÇÃO EM KANBAN ================= */}
+            {modoVisao === 'kanban' && (
+              <div className="flex gap-6 overflow-x-auto pb-6 snap-x w-full custom-scrollbar">
+                {listaStatus.map(status => {
+                  const pedidosColuna = pedidosFiltrados.filter(p => p.status === status);
+                  return (
+                    <div key={status} className="min-w-[320px] max-w-[320px] bg-slate-100/50 p-4 rounded-3xl border border-slate-200 shrink-0 snap-start flex flex-col max-h-[70vh]">
+                      <div className="flex justify-between items-center mb-4 px-2">
+                        <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wider">{status}</h4>
+                        <span className="bg-white border border-slate-200 text-slate-600 text-xs font-black px-2.5 py-1 rounded-full shadow-sm">{pedidosColuna.length}</span>
                       </div>
-                    ))}
-                    {pedidosColuna.length === 0 && (
-                      <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center opacity-50">
-                        <CheckCircle2 size={24} className="text-slate-400 mb-2"/>
-                        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Tudo Limpo</span>
+                      <div className="space-y-3 overflow-y-auto pr-1 flex-grow custom-scrollbar">
+                        {pedidosColuna.map(pedido => (
+                          <div key={pedido.id} onClick={() => setPedidoSelecionado(pedido)} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md hover:border-blue-400 transition-all group">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">#{pedido.id.slice(0,6)}</span>
+                              <span className="text-xs text-slate-400 font-medium flex items-center gap-1"><Clock size={12}/> {new Date(pedido.created_at).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})}</span>
+                            </div>
+                            <div className="text-sm text-slate-700 mb-4 font-medium flex items-center gap-2">
+                              <Package size={14} className="text-slate-400" />
+                              {pedido.itens_pedido?.length} {pedido.itens_pedido?.length === 1 ? 'item' : 'itens'}
+                            </div>
+                            <div className="flex justify-between pt-3 border-t border-slate-100 items-center">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</span>
+                              <span className="font-black text-slate-800">R$ {Number(pedido.total).toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {pedidosColuna.length === 0 && (
+                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center flex flex-col items-center justify-center opacity-50">
+                            <CheckCircle2 size={24} className="text-slate-400 mb-2"/>
+                            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Limpo</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ================= VISUALIZAÇÃO EM LISTA / TABELA ================= */}
+            {modoVisao === 'lista' && (
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[800px]">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="p-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Pedido / Data</th>
+                        <th className="p-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Itens</th>
+                        <th className="p-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Entrega</th>
+                        <th className="p-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th className="p-5 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {pedidosFiltrados.map(pedido => (
+                        <tr 
+                          key={pedido.id} 
+                          onClick={() => setPedidoSelecionado(pedido)}
+                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                        >
+                          <td className="p-5">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded w-fit">#{pedido.id.slice(0,8)}</span>
+                              <span className="text-xs text-slate-500 font-medium">{new Date(pedido.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
+                          </td>
+                          <td className="p-5">
+                            <span className="text-sm font-bold text-slate-700">{pedido.itens_pedido?.length} pçs</span>
+                          </td>
+                          <td className="p-5">
+                            <p className="text-sm text-slate-600 truncate max-w-[250px]" title={pedido.endereco_entrega}>{pedido.endereco_entrega}</p>
+                          </td>
+                          <td className="p-5">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap
+                              ${pedido.status === 'Entregue' ? 'bg-green-100 text-green-700' : 
+                                pedido.status === 'Enviado' ? 'bg-blue-100 text-blue-700' : 
+                                pedido.status === 'Aguardando Pagamento' ? 'bg-amber-100 text-amber-700' : 
+                                'bg-purple-100 text-purple-700'}`}
+                            >
+                              {pedido.status}
+                            </span>
+                          </td>
+                          <td className="p-5 font-black text-slate-800 text-right">
+                            R$ {Number(pedido.total).toFixed(2).replace('.', ',')}
+                          </td>
+                        </tr>
+                      ))}
+                      {pedidosFiltrados.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="p-8 text-center text-slate-400 font-medium">Nenhum pedido encontrado.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* MODAL DETALHES DO PEDIDO */}
+      {/* MODAL DETALHES DO PEDIDO (Mantido Intacto) */}
       {pedidoSelecionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col relative overflow-hidden">
