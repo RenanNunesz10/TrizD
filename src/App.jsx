@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import { Toaster } from 'react-hot-toast';
 import Pedidos from './pages/admin/Pedidos';
 import AnnouncementBar from './components/AnnouncementBar';
+import Promocoes from './pages/admin/Promocoes';
 
 // --- NOVO: Importamos o nosso gerenciador de autenticação ---
 import { useAuthStore } from './store/authStore'; 
@@ -66,6 +67,7 @@ function App() {
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="pedidos" element={<Pedidos />} />
+              <Route path="promocoes" element={<Promocoes />} />
               <Route path="estoque" element={<Estoque />} />
               <Route path="produtos" element={<Produtos />} />
               <Route path="calculadora" element={<Calculadora />} />

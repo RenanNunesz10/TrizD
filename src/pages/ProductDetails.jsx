@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Star, Truck, ShieldCheck, ShoppingCart, Plus, Sparkles, Minus, ChevronRight, Package, ArrowLeft, Ruler } from 'lucide-react';
+import { Star, Truck, ShieldCheck, ShoppingCart, Plus, Sparkles, Minus, ChevronRight, Package, ArrowLeft, Ruler, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import ModelViewer from '../components/ModelViewer';
+import ProductCard from '../components/ProductCard';
 import toast from 'react-hot-toast';
 
 export default function ProductDetails() {
@@ -14,19 +15,18 @@ export default function ProductDetails() {
   const [produto, setProduto] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Novos estados para a loja premium
   const [filamentos, setFilamentos] = useState([]);
   const [corSelecionada, setCorSelecionada] = useState(null);
   const [quantidade, setQuantidade] = useState(1);
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [cep, setCep] = useState('');
+  const [produtosRelacionados, setProdutosRelacionados] = useState([]);
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
         
-        // 1. Busca o Produto
         const { data: dataProd, error: erroProd } = await supabase
           .from('produtos')
           .select('*')
@@ -36,18 +36,16 @@ export default function ProductDetails() {
         if (erroProd) throw erroProd;
         setProduto(dataProd);
 
-        // 2. Busca os Materiais/Cores disponíveis no estoque
         const { data: dataFilamentos } = await supabase
           .from('estoque_filamentos')
           .select('*')
-          .gt('peso_atual', 50); // Só mostra se tiver mais de 50g
+          .gt('peso_atual', 50);
 
         setFilamentos(dataFilamentos || []);
         if (dataFilamentos && dataFilamentos.length > 0) {
-          setCorSelecionada(dataFilamentos[0]); // Seleciona a primeira cor por padrão
+          setCorSelecionada(dataFilamentos[0]); 
         }
 
-        // 3. Busca as Avaliações deste produto
         const { data: dataAvaliacoes } = await supabase
           .from('avaliacoes')
           .select('*')
@@ -56,6 +54,17 @@ export default function ProductDetails() {
           
         setAvaliacoes(dataAvaliacoes || []);
 
+        if (dataProd.categoria) {
+          const { data: dataRelacionados } = await supabase
+            .from('produtos')
+            .select('*')
+            .eq('categoria', dataProd.categoria)
+            .neq('id', dataProd.id)
+            .limit(4);
+            
+          setProdutosRelacionados(dataRelacionados || []);
+        }
+
       } catch (error) {
         toast.error('Produto não encontrado.');
         navigate('/');
@@ -63,23 +72,42 @@ export default function ProductDetails() {
         setLoading(false);
       }
     }
+
+    window.scrollTo(0, 0);
     fetchData();
   }, [id, navigate]);
 
-  // Cálculos de Avaliação
+  // 🛑 PROTEÇÃO: Mostra o Loading ANTES de tentar fazer qualquer cálculo
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-32">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // 🛑 PROTEÇÃO: Se por acaso o produto não existir, encerra aqui
+  if (!produto) return null;
+
+  // ✅ AGORA É SEGURO: A matemática só roda depois que temos certeza que 'produto' tem dados
+  const temOferta = produto.preco_promocional && Number(produto.preco_promocional) < Number(produto.preco);
+  const precoEfetivo = temOferta ? Number(produto.preco_promocional) : Number(produto.preco);
+  const porcentagemDesconto = temOferta 
+    ? Math.round(((Number(produto.preco) - Number(produto.preco_promocional)) / Number(produto.preco)) * 100) 
+    : 0;
+
   const mediaNotas = avaliacoes.length > 0 
     ? avaliacoes.reduce((acc, a) => acc + a.nota, 0) / avaliacoes.length 
     : 0;
 
   const handleComprar = () => {
-    // Adiciona ao carrinho com a cor selecionada (adicionando como uma propriedade extra)
     const produtoPersonalizado = {
       ...produto,
+      preco: precoEfetivo,
       cor_escolhida: corSelecionada?.nome || 'Padrão',
       cor_hex: corSelecionada?.cor || '#000000'
     };
     
-    // Adiciona a quantidade escolhida
     for (let i = 0; i < quantidade; i++) {
       addToCart(produtoPersonalizado);
     }
@@ -92,21 +120,10 @@ export default function ProductDetails() {
     toast.success('Frete grátis liberado para sua região!', { icon: '🚚' });
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-32">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!produto) return null;
-
   return (
-    <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-16">
+    <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-16 px-4 sm:px-6">
       
-      {/* Breadcrumb (Trilha de navegação) */}
-      <nav className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+      <nav className="flex items-center gap-2 text-sm text-slate-500 font-medium pt-8">
         <Link to="/" className="hover:text-blue-600 flex items-center gap-1"><ArrowLeft size={16}/> Voltar</Link>
         <ChevronRight size={14} />
         <Link to="/" className="hover:text-blue-600">{produto.categoria || 'Catálogo'}</Link>
@@ -116,8 +133,14 @@ export default function ProductDetails() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
         
-        {/* COLUNA ESQUERDA: VISUALIZADOR / IMAGEM */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden sticky top-24">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden sticky top-32 relative">
+          
+          {temOferta && (
+            <span className="absolute top-4 left-4 z-10 bg-red-500 text-white font-black text-xs px-3 py-1.5 rounded-full shadow-md animate-pulse flex items-center gap-1">
+              <Tag size={14}/> {porcentagemDesconto}% OFF
+            </span>
+          )}
+
           <div className="aspect-square bg-slate-50 flex items-center justify-center p-8">
             {produto.imagem_url?.endsWith('.glb') ? (
               <div className="w-full h-full cursor-move">
@@ -139,10 +162,8 @@ export default function ProductDetails() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA: INFORMAÇÕES E CHECKOUT */}
         <div className="space-y-8">
           
-          {/* Título e Estrelas */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider">
@@ -172,21 +193,27 @@ export default function ProductDetails() {
             </div>
           </div>
 
-          {/* Preço */}
           <div className="py-6 border-y border-slate-100">
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Preço Especial</p>
-            <div className="flex items-end gap-3">
-              <h2 className="text-5xl font-black text-blue-600">R$ {Number(produto.preco).toFixed(2).replace('.', ',')}</h2>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">
+              {temOferta ? 'OFERTA ESPECIAL' : 'Preço Especial'}
+            </p>
+            <div className="flex items-end gap-3 flex-wrap">
+              {temOferta && (
+                <span className="text-2xl font-bold text-slate-400 line-through mb-1">
+                  R$ {Number(produto.preco).toFixed(2).replace('.', ',')}
+                </span>
+              )}
+              <h2 className={`text-5xl font-black ${temOferta ? 'text-red-600' : 'text-blue-600'}`}>
+                R$ {precoEfetivo.toFixed(2).replace('.', ',')}
+              </h2>
               <p className="text-slate-500 font-medium mb-1.5">no PIX ou 12x no cartão</p>
             </div>
           </div>
 
-          {/* Descrição Curta */}
           <p className="text-slate-600 leading-relaxed text-lg">
             {produto.descricao || 'Peça produzida sob demanda com polímeros de alta resistência e excelente acabamento.'}
           </p>
 
-          {/* ESCOLHA DE COR/MATERIAL */}
           {filamentos.length > 0 && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -211,7 +238,6 @@ export default function ProductDetails() {
             </div>
           )}
 
-          {/* CONTROLE DE QUANTIDADE E BOTÃO COMPRAR */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-2xl px-2 w-full sm:w-40 h-14">
               <button 
@@ -237,7 +263,6 @@ export default function ProductDetails() {
             </button>
           </div>
 
-          {/* CÁLCULO DE FRETE (Mockup para visual) */}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
             <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><Truck size={18} className="text-blue-600"/> Calcular Frete e Prazo</h4>
             <div className="flex gap-2">
@@ -254,7 +279,6 @@ export default function ProductDetails() {
             </div>
           </div>
 
-          {/* BENEFÍCIOS RÁPIDOS */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
             <div className="flex items-center gap-3 text-slate-600">
               <Ruler className="text-slate-400" size={24}/>
@@ -271,7 +295,6 @@ export default function ProductDetails() {
 
       <hr className="border-slate-200 my-16" />
 
-      {/* SEÇÃO DE AVALIAÇÕES */}
       <section className="max-w-4xl mx-auto">
         <h3 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
           <Star className="text-amber-400 fill-amber-400" size={28}/> Avaliações dos Clientes
@@ -304,6 +327,22 @@ export default function ProductDetails() {
           </div>
         )}
       </section>
+
+      {produtosRelacionados.length > 0 && (
+        <section className="pt-16 mt-16 border-t border-slate-200">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+              <Package className="text-blue-600"/> Você também pode gostar
+            </h3>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {produtosRelacionados.map((prod) => (
+              <ProductCard key={prod.id} produto={prod} />
+            ))}
+          </div>
+        </section>
+      )}
 
     </div>
   );

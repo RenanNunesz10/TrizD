@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Printer, LayoutDashboard, Database, Box, Calculator, ShieldAlert, Truck } from 'lucide-react'; // <-- Importamos o Truck
+import { Printer, LayoutDashboard, Database, Box, Calculator, ShieldAlert, Truck, Tag } from 'lucide-react'; // <-- Importamos o Truck
 import { useAuthStore } from '../../store/authStore';
 
 export default function AdminLayout() {
@@ -12,6 +12,7 @@ export default function AdminLayout() {
   const navItens = [
     { path: '/admin', icone: LayoutDashboard, label: 'Visão Geral' },
     { path: '/admin/pedidos', icone: Truck, label: 'Gestão de Pedidos' }, // <-- NOVO BOTÃO
+    { path: '/admin/promocoes', icone: Tag, label: 'Ofertas & Cupons' },
     { path: '/admin/estoque', icone: Database, label: 'Controle de Estoque' },
     { path: '/admin/produtos', icone: Box, label: 'Catálogo de Produtos' },
     { path: '/admin/calculadora', icone: Calculator, label: 'Calculadora de Custos' },

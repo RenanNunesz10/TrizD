@@ -18,6 +18,13 @@ export default function ProductCard({ produto }) {
 
   const isFavorito = favoritos.includes(produto.id);
 
+  // --- LÓGICA DE PROMOÇÃO ---
+  const temOferta = produto.preco_promocional && Number(produto.preco_promocional) < Number(produto.preco);
+  const precoEfetivo = temOferta ? Number(produto.preco_promocional) : Number(produto.preco);
+  const porcentagemDesconto = temOferta 
+    ? Math.round(((Number(produto.preco) - Number(produto.preco_promocional)) / Number(produto.preco)) * 100) 
+    : 0;
+
   // Busca as avaliações deste produto no Supabase
   useEffect(() => {
     async function fetchAvaliacoes() {
@@ -49,13 +56,18 @@ export default function ProductCard({ produto }) {
     toast.success(isFavorito ? 'Removido dos favoritos' : 'Adicionado aos favoritos!');
   };
 
-  const precoFormatado = typeof produto.preco === 'number'
-    ? `R$ ${produto.preco.toFixed(2).replace('.', ',')}`
-    : produto.preco;
+  const precoFormatado = `R$ ${precoEfetivo.toFixed(2).replace('.', ',')}`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-shadow flex flex-col relative">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-shadow flex flex-col relative group">
       
+      {/* BADGE DE DESCONTO */}
+      {temOferta && (
+        <span className="absolute top-3 left-3 z-10 bg-red-500 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-md">
+          -{porcentagemDesconto}%
+        </span>
+      )}
+
       {/* Botão de Favorito no topo direito */}
       <button 
         onClick={handleFavoritar}
@@ -72,7 +84,7 @@ export default function ProductCard({ produto }) {
         {produto.imagem_url?.endsWith('.glb') ? (
           <ModelViewer modelUrl={produto.imagem_url} />
         ) : produto.imagem_url ? (
-          <img src={produto.imagem_url} alt={produto.nome} className="h-full w-full object-cover" />
+          <img src={produto.imagem_url} alt={produto.nome} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
           <span className="text-gray-400 font-medium">Sem imagem</span>
         )}
@@ -103,7 +115,17 @@ export default function ProductCard({ produto }) {
           )}
         </div>
 
-        <p className="text-blue-600 font-bold text-xl mt-auto pt-2">{precoFormatado}</p>
+        {/* PREÇOS (DE / POR) */}
+        <div className="mt-auto pt-2">
+          {temOferta && (
+            <span className="text-xs text-gray-400 line-through font-semibold block mb-0.5">
+              R$ {Number(produto.preco).toFixed(2).replace('.', ',')}
+            </span>
+          )}
+          <p className={`${temOferta ? 'text-red-600' : 'text-blue-600'} font-bold text-xl`}>
+            {precoFormatado}
+          </p>
+        </div>
         
         <Link 
           to={`/produto/${produto.id}`} 
