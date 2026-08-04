@@ -16,10 +16,13 @@ export default function Navbar() {
         {/* justify-center no mobile, justify-between no PC */}
         <div className="flex items-center justify-center md:justify-between h-16">
           
-          {/* LOGO */}
-          <Link to="/" className="flex items-center gap-2 text-xl font-black tracking-wider text-white hover:text-blue-400 transition-colors">
-            <Package className="text-blue-500" size={28} />
-            <span>3D<span className="text-blue-500">Store</span></span>
+          {/* LOGO TRIZD */}
+          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img 
+              src="/LogoBranco.png" 
+              alt="TrizD - Peças Impressas em 3D" 
+              className="h-10 sm:h-12 object-contain filter drop-shadow-md" 
+            />
           </Link>
 
           {/* MENU DESKTOP - Fica 100% invisível no celular (hidden md:flex) */}
