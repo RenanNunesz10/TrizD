@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
+import { Lock, ShieldCheck, CreditCard, ArrowLeft, Tag, Trash2, Plus, Minus } from 'lucide-react';
 
 export default function Checkout() {
-  const { cart, clearCart } = useCartStore();
+  // Adicionei updateQuantity e removeFromCart para o novo resumo visual
+  const { cart, clearCart, updateQuantity, removeFromCart } = useCartStore();
   const { user, perfil } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [enderecosSalvos, setEnderecosSalvos] = useState([]);
   const [salvarNovoEndereco, setSalvarNovoEndereco] = useState(false);
+  const [metodoPagamento, setMetodoPagamento] = useState('cartao'); // Apenas visual por enquanto
 
   // Formulário completo
   const [formData, setFormData] = useState({
@@ -38,12 +41,10 @@ export default function Checkout() {
     fetchEnderecos();
   }, [user, perfil]);
 
-  // Aplica um endereço salvo selecionado
   const handleSelecionarEnderecoSalvo = (e) => {
     const enderecoId = e.target.value;
     
     if (!enderecoId) {
-      // Limpa os campos para digitação manual
       setFormData((prev) => ({
         ...prev, cep: '', rua: '', numero: '', bairro: '', cidade: '', complemento: ''
       }));
@@ -67,7 +68,6 @@ export default function Checkout() {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // Busca do CEP no Checkout
   const buscarCEP = async (cepBuscado) => {
     const cepLimpo = cepBuscado.replace(/\D/g, '');
     if (cepLimpo.length !== 8) return;
@@ -89,8 +89,6 @@ export default function Checkout() {
         cep: data.cep
       }));
       
-      toast.success('Endereço encontrado!', { icon: '📍' });
-      
     } catch (error) {
       console.error('Erro ao buscar CEP:', error);
       toast.error('Erro de conexão ao buscar o CEP.');
@@ -103,7 +101,6 @@ export default function Checkout() {
     return isNaN(num) ? 0 : num;
   };
 
-  // ATUALIZADO: Multiplica o preço pela quantidade do item
   const totalCalculado = cart.reduce((acc, item) => acc + (parsePreco(item.preco) * (item.quantidade || 1)), 0);
 
   const handleFinalizarPedido = async (e) => {
@@ -114,7 +111,6 @@ export default function Checkout() {
       navigate('/login');
       return;
     }
-
     if (cart.length === 0) {
       toast.error('Seu carrinho está vazio!');
       return;
@@ -123,10 +119,8 @@ export default function Checkout() {
     setLoading(true);
 
     try {
-      // Formata a string completa de entrega para a tabela de pedidos
       const enderecoCompleto = `${formData.rua}, ${formData.numero}${formData.complemento ? ' (' + formData.complemento + ')' : ''} - ${formData.bairro}, ${formData.cidade} - CEP: ${formData.cep}`;
 
-      // 1. Opcional: Se o usuário marcou para salvar o endereço novo no perfil dele
       if (salvarNovoEndereco) {
         await supabase.from('enderecos').insert([{
           user_id: user.id,
@@ -140,16 +134,14 @@ export default function Checkout() {
         }]);
       }
 
-      // 2. Salva o pedido principal
       const { data: pedido, error: errorPedido } = await supabase
         .from('pedidos')
-        .insert([{ user_id: user.id, status: 'Em Impressão 3D', total: totalCalculado, endereco_entrega: enderecoCompleto }])
+        .insert([{ user_id: user.id, status: 'Aguardando Pagamento', total: totalCalculado, endereco_entrega: enderecoCompleto }])
         .select()
         .single();
 
       if (errorPedido) throw errorPedido;
 
-      // 3. Salva os itens do pedido (ATUALIZADO COM COR E QUANTIDADE)
       const itensParaInserir = cart.map((item) => ({
         pedido_id: pedido.id,
         nome_produto: item.cor_escolhida ? `${item.nome} (${item.cor_escolhida})` : item.nome,
@@ -174,152 +166,242 @@ export default function Checkout() {
 
   if (cart.length === 0) {
     return (
-      <div className="text-center py-20">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Seu carrinho está vazio</h2>
-        <button onClick={() => navigate('/')} className="text-blue-600 hover:underline cursor-pointer">Voltar para a loja</button>
+        <Link to="/" className="text-blue-600 hover:underline flex items-center gap-2 font-medium">
+          <ArrowLeft size={18}/> Voltar para a loja
+        </Link>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Acesso Restrito 🔒</h2>
-        <p className="text-gray-600 mb-6">Você precisa estar logado para acessar o pagamento.</p>
-        <div className="flex gap-4 justify-center">
-          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition cursor-pointer">Fazer Login</button>
-          <button onClick={() => navigate('/cadastro')} className="bg-gray-100 text-gray-800 border border-gray-300 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition cursor-pointer">Criar Conta</button>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-200 text-center max-w-md w-full">
+          <Lock size={48} className="mx-auto text-gray-300 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Checkout Seguro</h2>
+          <p className="text-gray-500 mb-8">Faça login para salvar seus dados e acompanhar o pedido.</p>
+          <button onClick={() => navigate('/login')} className="w-full bg-gray-900 text-white px-6 py-3.5 rounded-xl font-bold hover:bg-black transition mb-3">Entrar na Conta</button>
+          <button onClick={() => navigate('/cadastro')} className="w-full bg-white text-gray-800 border border-gray-200 px-6 py-3.5 rounded-xl font-bold hover:bg-gray-50 transition">Criar Conta</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row mt-8">
-      <div className="w-full md:w-2/3 p-6 md:p-10">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Dados de Entrega</h2>
-
-        {/* Seletor de Endereços Salvos */}
-        {enderecosSalvos.length > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <label className="block text-sm font-bold text-blue-800 mb-2">Usar um Endereço Salvo:</label>
-            <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-2 border border-blue-300 rounded bg-white font-medium text-gray-700 outline-none cursor-pointer">
-              <option value="">-- Digitar outro endereço --</option>
-              {enderecosSalvos.map((end) => (
-                <option key={end.id} value={end.id}>{end.titulo} - {end.rua}, {end.numero}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <form id="checkout-form" onSubmit={handleFinalizarPedido} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <input required type="text" name="nome" value={formData.nome} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-              <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-              <input 
-                required 
-                type="text" 
-                name="cep" 
-                maxLength="9"
-                placeholder="00000-000"
-                value={formData.cep} 
-                onChange={handleChange} 
-                onBlur={(e) => buscarCEP(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade / Estado</label>
-              <input required type="text" name="cidade" value={formData.cidade} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rua / Avenida</label>
-              <input required type="text" name="rua" value={formData.rua} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
-              <input required type="text" name="numero" value={formData.numero} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
-              <input required type="text" name="bairro" value={formData.bairro} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Complemento (Opcional)</label>
-              <input type="text" name="complemento" placeholder="Apt, Bloco..." value={formData.complemento} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
-            </div>
-          </div>
-
-          {/* Opção de salvar no perfil caso seja um endereço digitado manualmente */}
-          <div className="pt-2 flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              id="salvarEndereco" 
-              checked={salvarNovoEndereco} 
-              onChange={(e) => setSalvarNovoEndereco(e.target.checked)} 
-              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-            />
-            <label htmlFor="salvarEndereco" className="text-sm font-medium text-gray-700 cursor-pointer">
-              Salvar este novo endereço no meu perfil para próximas compras
-            </label>
-          </div>
-        </form>
-      </div>
-
-      <div className="w-full md:w-1/3 bg-gray-50 p-6 md:p-10 border-t md:border-t-0 md:border-l border-gray-200">
-        <h3 className="text-xl font-bold text-gray-800 mb-6">Resumo do Pedido</h3>
+    <div className="min-h-screen bg-gray-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-7xl mx-auto">
         
-        <div className="space-y-4 mb-6 max-h-80 overflow-y-auto custom-scrollbar">
-          {cart.map((item, index) => (
-            <div key={index} className="flex justify-between items-start text-sm">
-              <div className="flex flex-col flex-1 pr-2">
-                <span className="text-gray-800 font-bold">{item.nome}</span>
-                
-                {/* ATUALIZADO: Exibe a cor com a bolinha no resumo */}
-                {item.cor_escolhida ? (
-                  <span className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-1">
-                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: item.cor_hex || '#000' }} />
-                    {item.cor_escolhida} ({item.quantidade || 1}x)
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-500 mt-1">({item.quantidade || 1}x)</span>
-                )}
-              </div>
-              
-              <span className="text-gray-900 font-bold whitespace-nowrap">
-                R$ {(parsePreco(item.preco) * (item.quantidade || 1)).toFixed(2).replace('.', ',')}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="border-t border-gray-200 pt-4 mb-6">
-          <div className="flex justify-between items-center font-bold text-xl">
-            <span>Total:</span>
-            <span className="text-blue-600">R$ {totalCalculado.toFixed(2).replace('.', ',')}</span>
+        {/* Cabeçalho minimalista */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
+          <Link to="/" className="text-gray-500 hover:text-gray-900 transition flex items-center gap-2">
+            <ArrowLeft size={20} /> <span className="font-medium">Voltar para a loja</span>
+          </Link>
+          <div className="flex items-center gap-2 text-green-600 text-sm font-bold">
+            <ShieldCheck size={18} /> Checkout Seguro
           </div>
         </div>
 
-        <button form="checkout-form" type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-colors cursor-pointer disabled:bg-gray-400 shadow-lg shadow-green-600/20">
-          {loading ? 'Processando...' : 'Confirmar e Pagar'}
-        </button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          
+          {/* COLUNA ESQUERDA: FORMULÁRIOS */}
+          <div className="lg:col-span-7 space-y-8">
+            
+            {/* Informações de Envio */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Informações de Envio</h2>
+              
+              {enderecosSalvos.length > 0 && (
+                <div className="mb-6 p-1 border border-gray-200 rounded-xl bg-gray-50/50 flex">
+                  <select onChange={handleSelecionarEnderecoSalvo} className="w-full p-3 bg-transparent font-medium text-gray-700 outline-none cursor-pointer text-sm">
+                    <option value="">Usar um endereço diferente...</option>
+                    {enderecosSalvos.map((end) => (
+                      <option key={end.id} value={end.id}>{end.titulo} - {end.rua}, {end.numero}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <form id="checkout-form" onSubmit={handleFinalizarPedido} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Nome Completo</label>
+                    <input required type="text" name="nome" value={formData.nome} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">E-mail</label>
+                    <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">CEP</label>
+                    <input required type="text" name="cep" maxLength="9" placeholder="00000-000" value={formData.cep} onChange={handleChange} onBlur={(e) => buscarCEP(e.target.value)} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Cidade / Estado</label>
+                    <input required type="text" name="cidade" value={formData.cidade} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Rua / Avenida</label>
+                    <input required type="text" name="rua" value={formData.rua} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Número</label>
+                    <input required type="text" name="numero" value={formData.numero} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Bairro</label>
+                    <input required type="text" name="bairro" value={formData.bairro} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Complemento (Opcional)</label>
+                    <input type="text" name="complemento" placeholder="Apt, Bloco..." value={formData.complemento} onChange={handleChange} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 focus:ring-0 outline-none transition text-sm font-medium" />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-3">
+                  <input type="checkbox" id="salvarEndereco" checked={salvarNovoEndereco} onChange={(e) => setSalvarNovoEndereco(e.target.checked)} className="w-4 h-4 text-gray-900 rounded border-gray-300 focus:ring-gray-900 cursor-pointer accent-gray-900"/>
+                  <label htmlFor="salvarEndereco" className="text-sm font-medium text-gray-600 cursor-pointer">
+                    Salvar estas informações para a próxima compra
+                  </label>
+                </div>
+              </form>
+            </div>
+
+            {/* Método de Pagamento (Visual para matching de Layout) */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Método de Pagamento</h2>
+              <div className="space-y-3">
+                <div onClick={() => setMetodoPagamento('cartao')} className={`p-4 border rounded-2xl cursor-pointer flex items-center gap-3 transition ${metodoPagamento === 'cartao' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${metodoPagamento === 'cartao' ? 'border-gray-900' : 'border-gray-300'}`}>
+                    {metodoPagamento === 'cartao' && <div className="w-2.5 h-2.5 bg-gray-900 rounded-full" />}
+                  </div>
+                  <CreditCard size={20} className="text-gray-500" />
+                  <span className="font-bold text-sm text-gray-800">Cartão de Crédito/Débito</span>
+                </div>
+                
+                {metodoPagamento === 'cartao' && (
+                  <div className="px-2 pb-4 pt-2 space-y-4 animate-fade-in">
+                     <input type="text" placeholder="Número do Cartão" className="w-full p-3.5 border border-gray-200 rounded-xl bg-white outline-none text-sm font-medium" disabled />
+                     <div className="grid grid-cols-2 gap-4">
+                        <input type="text" placeholder="MM/AA" className="w-full p-3.5 border border-gray-200 rounded-xl bg-white outline-none text-sm font-medium" disabled />
+                        <input type="text" placeholder="CVC" className="w-full p-3.5 border border-gray-200 rounded-xl bg-white outline-none text-sm font-medium" disabled />
+                     </div>
+                  </div>
+                )}
+
+                <div onClick={() => setMetodoPagamento('pix')} className={`p-4 border rounded-2xl cursor-pointer flex items-center gap-3 transition ${metodoPagamento === 'pix' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${metodoPagamento === 'pix' ? 'border-gray-900' : 'border-gray-300'}`}>
+                    {metodoPagamento === 'pix' && <div className="w-2.5 h-2.5 bg-gray-900 rounded-full" />}
+                  </div>
+                  <div className="w-5 h-5 bg-teal-500 rounded text-white flex items-center justify-center text-[10px] font-black">P</div>
+                  <span className="font-bold text-sm text-gray-800">PIX (Aprovação Imediata)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Código Promocional */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-3">
+               <div className="flex-1 relative">
+                 <Tag className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                 <input type="text" placeholder="Insira o código promocional" className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-gray-900 outline-none text-sm font-medium" />
+               </div>
+               <button type="button" className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-8 py-3.5 rounded-xl font-bold transition">Aplicar</button>
+            </div>
+
+          </div>
+
+          {/* COLUNA DIREITA: RESUMO DO PEDIDO */}
+          <div className="lg:col-span-5">
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm sticky top-24">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Resumo do Pedido</h2>
+              
+              <div className="space-y-6 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex gap-4 items-center group">
+                    <div className="w-20 h-20 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+                      {item.imagem_url ? (
+                        <img src={item.imagem_url} alt={item.nome} className="w-full h-full object-contain p-2" />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100" />
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 text-sm truncate">{item.nome}</h4>
+                      {item.cor_escolhida && (
+                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                          Cor: <span className="w-2.5 h-2.5 rounded-full inline-block border border-gray-200" style={{ backgroundColor: item.cor_hex || '#000' }} /> {item.cor_escolhida}
+                        </p>
+                      )}
+                      
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-3 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200 w-fit">
+                          <button type="button" onClick={() => updateQuantity(index, item.quantidade - 1)} className="text-gray-400 hover:text-gray-900"><Minus size={14}/></button>
+                          <span className="text-xs font-bold text-gray-900 w-3 text-center">{item.quantidade || 1}</span>
+                          <button type="button" onClick={() => updateQuantity(index, (item.quantidade || 1) + 1)} className="text-gray-400 hover:text-gray-900"><Plus size={14}/></button>
+                        </div>
+                        <button type="button" onClick={() => removeFromCart(index)} className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1">
+                          <Trash2 size={12}/> Remover
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="font-bold text-gray-900 text-sm">
+                      R$ {(parsePreco(item.preco) * (item.quantidade || 1)).toFixed(2).replace('.', ',')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-gray-100 pt-6 space-y-3 mb-6">
+                <div className="flex justify-between text-sm text-gray-500 font-medium">
+                  <span>Subtotal</span>
+                  <span className="text-gray-900">R$ {totalCalculado.toFixed(2).replace('.', ',')}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500 font-medium">
+                  <span>Frete</span>
+                  <span className="text-gray-900">R$ 15,00</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500 font-medium">
+                  <span>Desconto (Frete Grátis)</span>
+                  <span className="text-green-600">- R$ 15,00</span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-6 mb-6">
+                <div className="flex justify-between items-center text-xl">
+                  <span className="font-black text-gray-900">Total</span>
+                  <span className="font-black text-gray-900">R$ {totalCalculado.toFixed(2).replace('.', ',')}</span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 text-blue-700 text-xs font-bold p-3 rounded-xl flex items-center justify-center gap-2 mb-6 border border-blue-100">
+                <ShieldCheck size={16} /> Frete grátis liberado para sua região
+              </div>
+
+              <button form="checkout-form" type="submit" disabled={loading} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl transition-all cursor-pointer disabled:bg-gray-300 disabled:text-gray-500 flex items-center justify-center gap-2">
+                {loading ? 'Processando...' : 'Fazer Pedido'}
+              </button>
+
+              <div className="flex justify-center gap-6 mt-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className="flex items-center gap-1"><Lock size={12}/> Pagamento Seguro</span>
+                <span className="flex items-center gap-1"><ShieldCheck size={12}/> SSL Encriptado</span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );

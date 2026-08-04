@@ -11,6 +11,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
 import { Toaster } from 'react-hot-toast';
 import Pedidos from './pages/admin/Pedidos';
+import AnnouncementBar from './components/AnnouncementBar';
 
 // --- NOVO: Importamos o nosso gerenciador de autenticação ---
 import { useAuthStore } from './store/authStore'; 
@@ -32,18 +33,21 @@ function StoreLayout() {
 }
 
 function App() {
-  // --- NOVO: Puxamos a função que verifica quem está logado ---
   const { checkUser } = useAuthStore(); 
 
-  // --- NOVO: Avisamos o React para rodar essa checagem assim que o site abrir ---
   useEffect(() => {
     checkUser();
-  }, []); // Essa array vazia [] garante que só rode 1 vez ao abrir o site
+  }, []);
 
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+        
+        {/* === NOSSA NOVA BARRA AQUI === */}
+        <AnnouncementBar />
+        
         <Navbar />
+
         <main className="flex-grow w-full">
           <Routes>
             
