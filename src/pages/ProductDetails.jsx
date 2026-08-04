@@ -77,7 +77,6 @@ export default function ProductDetails() {
     fetchData();
   }, [id, navigate]);
 
-  // 🛑 PROTEÇÃO: Mostra o Loading ANTES de tentar fazer qualquer cálculo
   if (loading) {
     return (
       <div className="flex justify-center items-center py-32">
@@ -86,10 +85,8 @@ export default function ProductDetails() {
     );
   }
 
-  // 🛑 PROTEÇÃO: Se por acaso o produto não existir, encerra aqui
   if (!produto) return null;
 
-  // ✅ AGORA É SEGURO: A matemática só roda depois que temos certeza que 'produto' tem dados
   const temOferta = produto.preco_promocional && Number(produto.preco_promocional) < Number(produto.preco);
   const precoEfetivo = temOferta ? Number(produto.preco_promocional) : Number(produto.preco);
   const porcentagemDesconto = temOferta 
@@ -121,7 +118,7 @@ export default function ProductDetails() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-16 px-4 sm:px-6">
+    <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-40 md:pb-16 px-4 sm:px-6">
       
       <nav className="flex items-center gap-2 text-sm text-slate-500 font-medium pt-8">
         <Link to="/" className="hover:text-blue-600 flex items-center gap-1"><ArrowLeft size={16}/> Voltar</Link>
@@ -133,7 +130,8 @@ export default function ProductDetails() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
         
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden sticky top-32 relative">
+        {/* CORREÇÃO 2: Trocamos 'sticky' por 'lg:sticky', assim a foto só fixa no Computador! */}
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden lg:sticky lg:top-32 relative">
           
           {temOferta && (
             <span className="absolute top-4 left-4 z-10 bg-red-500 text-white font-black text-xs px-3 py-1.5 rounded-full shadow-md animate-pulse flex items-center gap-1">
@@ -257,7 +255,7 @@ export default function ProductDetails() {
 
             <button 
               onClick={handleComprar}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-2xl font-black text-lg transition-all shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:-translate-y-0.5 flex items-center justify-center gap-3 cursor-pointer"
+              className="hidden md:flex flex-1 bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-2xl font-black text-lg transition-all shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:-translate-y-0.5 items-center justify-center gap-3 cursor-pointer"
             >
               <ShoppingCart size={24} /> Adicionar ao Carrinho
             </button>
@@ -343,6 +341,22 @@ export default function ProductDetails() {
           </div>
         </section>
       )}
+
+      {/* CORREÇÃO 3: Subimos a barra de 'bottom-[64px]' para 'bottom-[76px]' para não encavalar */}
+      <div className="md:hidden fixed bottom-[76px] left-0 w-full bg-white border-t border-slate-200 p-3 px-4 z-40 flex items-center gap-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] animate-fade-in">
+        <div className="flex flex-col flex-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total ({quantidade}x)</span>
+          <span className="font-black text-blue-600 text-lg leading-none">
+            R$ {(precoEfetivo * quantidade).toFixed(2).replace('.', ',')}
+          </span>
+        </div>
+        <button 
+          onClick={handleComprar}
+          className="bg-blue-600 hover:bg-blue-700 text-white h-12 px-6 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-transform active:scale-95 cursor-pointer"
+        >
+          <ShoppingCart size={18} /> Adicionar
+        </button>
+      </div>
 
     </div>
   );

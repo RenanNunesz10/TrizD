@@ -13,6 +13,7 @@ import { Toaster } from 'react-hot-toast';
 import Pedidos from './pages/admin/Pedidos';
 import AnnouncementBar from './components/AnnouncementBar';
 import Promocoes from './pages/admin/Promocoes';
+import MobileBottomNav from './components/MobileBottomNav';
 
 // --- NOVO: Importamos o nosso gerenciador de autenticação ---
 import { useAuthStore } from './store/authStore'; 
@@ -42,7 +43,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+      <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-20 md:pb-0">
         
         {/* === NOSSA NOVA BARRA AQUI === */}
         <AnnouncementBar />
@@ -75,6 +76,7 @@ function App() {
 
           </Routes>
         </main>
+        <MobileBottomNav />
         <CartDrawer />
       </div>
       <Toaster position="bottom-right" />
