@@ -8,7 +8,6 @@ export const useCartStore = create(
       isOpen: false,
       setIsOpen: (isOpen) => set({ isOpen }),
       
-      // A PEÇA QUE FALTAVA PARA O BOTÃO DA NAVBAR FUNCIONAR:
       toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
       
       addToCart: (product) => {
@@ -22,9 +21,11 @@ export const useCartStore = create(
         if (existingIndex > -1) {
           const newCart = [...cart];
           newCart[existingIndex].quantidade = (newCart[existingIndex].quantidade || 1) + (product.quantidade || 1);
-          set({ cart: newCart, isOpen: true });
+          // REMOVIDO o isOpen: true daqui!
+          set({ cart: newCart });
         } else {
-          set({ cart: [...cart, { ...product, quantidade: product.quantidade || 1 }], isOpen: true });
+          // REMOVIDO o isOpen: true daqui também!
+          set({ cart: [...cart, { ...product, quantidade: product.quantidade || 1 }] });
         }
       },
 
