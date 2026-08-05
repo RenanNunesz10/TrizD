@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
-import { useEffect } from 'react'; // <-- NOVO: Importamos o useEffect
+import { useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -13,6 +13,7 @@ import { Toaster } from 'react-hot-toast';
 import Pedidos from './pages/admin/Pedidos';
 import AnnouncementBar from './components/AnnouncementBar';
 import Promocoes from './pages/admin/Promocoes';
+import Footer from './components/Footer';
 import MobileBottomNav from './components/MobileBottomNav';
 
 // --- NOVO: Importamos o nosso gerenciador de autenticação ---
@@ -43,7 +44,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-20 md:pb-0">
+      <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         
         {/* === NOSSA NOVA BARRA AQUI === */}
         <AnnouncementBar />
@@ -76,6 +77,7 @@ function App() {
 
           </Routes>
         </main>
+        <Footer />
         <MobileBottomNav />
         <CartDrawer />
       </div>
